@@ -1,0 +1,199 @@
+#!/usr/bin/env python3
+"""Generate one colors.toml per background for the Sadie My Love theme.
+
+Raw Aether extraction collapses these wallpapers into a single gold hue: on
+1412030 six of its sixteen slots land within a few RGB units of each other,
+which makes a failing test and a passing test the same colour. So extraction is
+not used directly.
+
+Instead the hand-tuned copper/oxblood palette below is the design system. It
+carries the verified structure -- an even L* background ladder, low-chroma body
+text, >=4.5:1 on every text colour, and separated ANSI hues. Each wallpaper
+contributes only a *hue rotation*, derived from its own extracted accent, which
+is applied at a fraction of full strength to every slot. Lightness and chroma
+are preserved exactly, so the contrast and separation guarantees survive by
+construction rather than by luck.
+
+Work is done in Oklch, where a hue rotation is perceptually even across the
+whole palette; naive HSL rotation would swing the yellows far more than the
+reds and pull the palette apart.
+"""
+
+import math
+import subprocess
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from oklch import clip_to_gamut, hex_to_oklch, oklch_to_hex  # noqa: E402
+
+THEME = Path(__file__).resolve().parent.parent
+BACKGROUNDS = THEME / "backgrounds"
+PALETTES = THEME / "palettes"
+
+# How much of each wallpaper's hue offset to apply. At 1.0 the palettes drift
+# far enough apart to stop reading as one theme; at 0 they are identical.
+HUE_STRENGTH = 0.7
+# Hue rotation is clamped so an outlier wallpaper cannot swing the UI somewhere
+# that no longer belongs to this theme.
+MAX_ROTATION = 28.0
+
+REFERENCE = {
+    "accent": "#c9714f", "selection": "#54313a", "muted": "#5c4e4c",
+    "background": "#171314", "dark_background": "#100c0d",
+    "darker_background": "#0b0708", "lighter_background": "#2b2224",
+    "foreground": "#e8ddd4", "dark_foreground": "#8f7f79",
+    "light_foreground": "#f2eae3", "bright_foreground": "#faf5f1",
+    "red": "#d4614f", "yellow": "#e0a44e", "orange": "#d98f52",
+    "green": "#9fa86a", "cyan": "#7fa39b", "blue": "#8896b8",
+    "magenta": "#c17a94", "brown": "#7a5344",
+    "bright_red": "#ee6d55", "bright_yellow": "#f2bb63",
+    "bright_green": "#b7c07e", "bright_cyan": "#98bcb3",
+    "bright_blue": "#a0adcd", "bright_magenta": "#d692aa",
+}
+
+# Near-neutral slots are rotated less: a hue shift on something with almost no
+# chroma reads as a colour cast on what should be plain text or plain surface.
+NEUTRAL_DAMPING = {
+    "foreground": 0.35, "light_foreground": 0.35, "bright_foreground": 0.3,
+    "dark_foreground": 0.5, "muted": 0.5,
+    "background": 0.5, "dark_background": 0.5, "darker_background": 0.5,
+    "lighter_background": 0.6,
+}
+
+KEY_ORDER = list(REFERENCE)
+
+
+# --- extraction -----------------------------------------------------------
+
+def extract(path):
+    out = subprocess.run(["aether", "--extract-palette", str(path)],
+                         capture_output=True, text=True, check=True).stdout
+    cols = []
+    for line in out.splitlines():
+        parts = line.split()
+        if len(parts) == 2 and parts[1].startswith("#"):
+            cols.append(parts[1].lower())
+    if len(cols) < 16:
+        raise SystemExit(f"aether returned {len(cols)} colours for {path}")
+    return cols
+
+
+def image_hue(path):
+    """Chroma-weighted circular mean hue of the image itself.
+
+    Aether's extraction is not trustworthy as a hue source here. On the
+    1412030 collage it returns sixteen warm gold/copper slots and misses the
+    sage-green field entirely, because the *subject* is warm even though most
+    of the *canvas* is not. Quantising the actual pixels and weighting each
+    bucket by (population x chroma) measures what the eye actually sees, and
+    ignores the near-neutral paper and shadow that carry no hue.
+    """
+    out = subprocess.run(
+        ["magick", str(path), "-resize", "300x", "-colors", "24",
+         "-format", "%c", "histogram:info:"],
+        capture_output=True, text=True, check=True).stdout
+
+    xs = ys = 0.0
+    for line in out.splitlines():
+        line = line.strip()
+        if ":" not in line or "#" not in line:
+            continue
+        try:
+            count = int(line.split(":", 1)[0])
+        except ValueError:
+            continue
+        hexcol = "#" + line.split("#", 1)[1][:6]
+        try:
+            L, C, H = hex_to_oklch(hexcol)
+        except Exception:
+            continue
+        # Skip near-neutrals and the extremes of the tone range; neither
+        # carries a usable hue.
+        if C < 0.03 or L < 0.12 or L > 0.95:
+            continue
+        w = count * C
+        xs += w * math.cos(math.radians(H))
+        ys += w * math.sin(math.radians(H))
+    if xs == 0 and ys == 0:
+        return None
+    return math.degrees(math.atan2(ys, xs)) % 360
+
+
+def dominant_hue(cols):
+    """Circular mean hue of the wallpaper's chromatic mid-tones.
+
+    Slots 0, 8 and 15 are the near-neutral black/grey/white anchors and carry
+    essentially no hue information, so they are excluded; weighting the rest by
+    chroma keeps a washed-out slot from dragging the mean around.
+    """
+    xs = ys = 0.0
+    for i, c in enumerate(cols[:16]):
+        if i in (0, 8, 15):
+            continue
+        L, C, H = hex_to_oklch(c)
+        if C < 0.02:
+            continue
+        xs += C * math.cos(math.radians(H))
+        ys += C * math.sin(math.radians(H))
+    return math.degrees(math.atan2(ys, xs)) % 360
+
+
+def build(rotation):
+    out = {}
+    for key in KEY_ORDER:
+        L, C, H = hex_to_oklch(REFERENCE[key])
+        damp = NEUTRAL_DAMPING.get(key, 1.0)
+        L, C, H = clip_to_gamut(L, C, (H + rotation * damp) % 360)
+        out[key] = oklch_to_hex(L, C, H)
+    return out
+
+
+def main():
+    PALETTES.mkdir(exist_ok=True)
+    ref_img = BACKGROUNDS / "01-1412030.png"
+    ref_hue = image_hue(ref_img) or dominant_hue(extract(ref_img))
+
+    imgs = sorted(p for p in BACKGROUNDS.iterdir()
+                  if p.suffix.lower() in (".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif"))
+    for img in imgs:
+        cols = extract(img)
+        a_hue = dominant_hue(cols)
+        hue = image_hue(img)
+        if hue is None:
+            hue = a_hue
+        delta = ((hue - ref_hue + 180) % 360) - 180
+        rot = max(-MAX_ROTATION, min(MAX_ROTATION, delta * HUE_STRENGTH))
+        pal = build(rot)
+
+        body = [
+            f"# Sadie My Love - palette for {img.name}",
+            f"# Generated by bin/generate-palettes. Do not hand-edit;",
+            f"# edit REFERENCE in that script and regenerate.",
+            f"# image hue {hue:.1f}deg (aether read {a_hue:.1f}deg) | "
+            f"offset {delta:+.1f}deg | applied {rot:+.1f}deg",
+            'mode = "dark"',
+            "",
+        ]
+        groups = [
+            ("accent", "selection", "muted"), None,
+            ("background", "dark_background", "darker_background", "lighter_background"), None,
+            ("foreground", "dark_foreground", "light_foreground", "bright_foreground"), None,
+            ("red", "yellow", "orange", "green", "cyan", "blue", "magenta", "brown"), None,
+            ("bright_red", "bright_yellow", "bright_green", "bright_cyan",
+             "bright_blue", "bright_magenta"),
+        ]
+        for grp in groups:
+            if grp is None:
+                body.append("")
+                continue
+            for k in grp:
+                body.append(f'{k} = "{pal[k]}"')
+
+        dest = PALETTES / (img.stem + ".toml")
+        dest.write_text("\n".join(body) + "\n")
+        print(f"{img.name:22} image {hue:6.1f}  aether {a_hue:6.1f}  offset {delta:+6.1f}  applied {rot:+5.1f}  -> {dest.name}")
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,166 @@
+#!/usr/bin/env python3
+"""Render preview.png for this theme.
+
+Omarchy's theme switcher shows preview.png as the theme's tile, and every
+stock theme ships the same thing: a screenshot of a live desktop -- bar,
+neovim, a terminal, btop, a file manager -- tiled over the wallpaper. A tile
+in any other format reads as a different kind of object in the picker.
+
+Taking a real screenshot would mean driving a live session into a specific
+window arrangement and could not be reproduced. The same desktop is laid out
+in bin/preview-template.html instead, filled with this theme's palette and
+wallpaper and rendered headlessly, so every colour in the tile comes from
+colors.toml by construction and cannot drift from what the theme applies.
+"""
+
+import base64
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+THEME = Path(__file__).resolve().parent.parent
+TEMPLATE = THEME / "bin" / "preview-template.html"
+BACKGROUNDS = THEME / "backgrounds"
+OUTPUT = THEME / "preview.png"
+
+WIDTH, HEIGHT = 1800, 1012
+
+# colors.toml key -> CSS custom property used by the template.
+CSS_VARS = {
+    "background": "bg", "dark_background": "dbg", "darker_background": "ddbg",
+    "lighter_background": "lbg", "foreground": "fg", "dark_foreground": "dfg",
+    "light_foreground": "lfg", "bright_foreground": "bfg", "muted": "muted",
+    "selection": "sel", "accent": "accent", "red": "red", "yellow": "yellow",
+    "orange": "orange", "green": "green", "cyan": "cyan", "blue": "blue",
+    "magenta": "magenta", "brown": "brown", "bright_red": "bred",
+    "bright_yellow": "byellow", "bright_green": "bgreen",
+    "bright_cyan": "bcyan", "bright_blue": "bblue",
+    "bright_magenta": "bmagenta",
+}
+
+
+def die(message):
+    print(f"generate-preview: {message}", file=sys.stderr)
+    sys.exit(1)
+
+
+def find_browser():
+    for name in ("chromium", "google-chrome-stable", "google-chrome", "brave"):
+        path = shutil.which(name)
+        if path:
+            return path
+    die("no chromium-compatible browser found on PATH")
+
+
+def read_palette(colors_file):
+    colors = {}
+    for line in colors_file.read_text().splitlines():
+        match = re.match(r'^\s*([a-z_]+)\s*=\s*"(#[0-9a-fA-F]{6})"\s*$', line)
+        if match:
+            colors[match.group(1)] = match.group(2)
+
+    missing = [key for key in CSS_VARS if key not in colors]
+    if missing:
+        die(f"{colors_file} is missing: {', '.join(missing)}")
+    return colors
+
+
+def background_for(colors_file):
+    """The wallpaper this palette was generated from.
+
+    generate-palettes stamps the source filename into the header comment, so
+    the preview shows the wallpaper whose colours it is actually rendering in.
+    """
+    header = colors_file.read_text()[:400]
+    match = re.search(r"palette for (\S+)", header)
+    if match:
+        candidate = BACKGROUNDS / match.group(1)
+        if candidate.is_file():
+            return candidate
+
+    backgrounds = sorted(
+        path for path in BACKGROUNDS.iterdir()
+        if path.suffix.lower() in (".png", ".jpg", ".jpeg")
+    )
+    if not backgrounds:
+        die(f"no backgrounds in {BACKGROUNDS}")
+    return backgrounds[0]
+
+
+def encode_background(image, workdir):
+    """Downscale to the preview size before embedding.
+
+    A 4K wallpaper base64'd into the page is ~20MB of markup for pixels that
+    are only ever seen through the window gaps.
+    """
+    scaled = workdir / "background.jpg"
+    subprocess.run(
+        ["magick", str(image),
+         "-resize", f"{WIDTH}x{HEIGHT}^",
+         "-gravity", "center", "-extent", f"{WIDTH}x{HEIGHT}",
+         "-quality", "88", str(scaled)],
+        check=True,
+    )
+    return base64.b64encode(scaled.read_bytes()).decode()
+
+
+def render(html_file, workdir, browser):
+    shot = workdir / "preview.png"
+    subprocess.run(
+        [browser, "--headless", "--disable-gpu", "--hide-scrollbars",
+         "--force-device-scale-factor=1",
+         f"--window-size={WIDTH},{HEIGHT}",
+         f"--screenshot={shot}", str(html_file)],
+        check=True, capture_output=True,
+    )
+    if not shot.is_file():
+        die("browser produced no screenshot")
+    return shot
+
+
+def main():
+    argv = sys.argv[1:]
+    if argv and argv[0] in ("-h", "--help"):
+        print("Usage: generate-preview [palettes/NN-name.toml]")
+        return
+
+    colors_file = Path(argv[0]) if argv else THEME / "colors.toml"
+    if not colors_file.is_file():
+        die(f"no such palette: {colors_file}")
+
+    browser = find_browser()
+    if not shutil.which("magick"):
+        die("imagemagick (magick) is required")
+
+    colors = read_palette(colors_file)
+    variables = "  :root {\n" + "".join(
+        f"    --{var}: {colors[key]};\n" for key, var in CSS_VARS.items()
+    ) + "  }"
+
+    with tempfile.TemporaryDirectory() as tmp:
+        workdir = Path(tmp)
+        background = background_for(colors_file)
+        html = (TEMPLATE.read_text()
+                .replace("__VARS__", variables)
+                .replace("__BG__", encode_background(background, workdir)))
+
+        html_file = workdir / "preview.html"
+        html_file.write_text(html)
+
+        # -strip drops the render metadata; the tile is decorative and the
+        # theme repo should not carry a new timestamp on every regeneration.
+        subprocess.run(
+            ["magick", str(render(html_file, workdir, browser)),
+             "-strip", str(OUTPUT)],
+            check=True,
+        )
+
+    print(f"{OUTPUT.relative_to(THEME.parent)} <- {colors_file.name}, "
+          f"{background.name}")
+
+
+if __name__ == "__main__":
+    main()

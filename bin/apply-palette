@@ -1,0 +1,39 @@
+#!/bin/bash
+# Swap colors.toml to the palette matching the current background, then
+# re-apply the theme. Idempotent and safe to call from anywhere.
+set -uo pipefail
+
+THEME_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+THEME_SLUG="sadie-my-love"
+STATE="$HOME/.local/state/omarchy/current"
+LOCK="${XDG_RUNTIME_DIR:-/tmp}/sadie-palette.lock"
+
+# Only ever act while this theme is the active one. Every other theme is
+# none of our business.
+[[ $(cat "$STATE/theme.name" 2>/dev/null) == "$THEME_SLUG" ]] || exit 0
+
+background=$(readlink -f "$STATE/background" 2>/dev/null) || exit 0
+[[ -n $background ]] || exit 0
+
+stem=$(basename "$background"); stem="${stem%.*}"
+palette="$THEME_DIR/palettes/$stem.toml"
+[[ -f $palette ]] || exit 0
+
+# Already correct - nothing to do. This guard is what makes the watcher's
+# extra wakeups free.
+cmp -s "$palette" "$THEME_DIR/colors.toml" && exit 0
+
+# Never let two applies overlap.
+exec 9>"$LOCK"
+flock -n 9 || exit 0
+
+cp "$palette" "$THEME_DIR/colors.toml"
+
+# btop is hand-designed rather than generated from Omarchy's template, so it
+# has to be re-rendered against the new palette or it keeps the old hue while
+# every generated surface rotates away from it.
+"$THEME_DIR/bin/generate-btop" >/dev/null
+
+# SKIP_BACKGROUND matters: omarchy-theme-set would otherwise cycle to the
+# *next* wallpaper, fighting the one the user just chose.
+OMARCHY_THEME_SKIP_BACKGROUND=1 omarchy-theme-set "$THEME_SLUG" >/dev/null 2>&1

@@ -1,0 +1,12 @@
+# Background/unlock carousel. The picker has no card of its own, so the scrim
+# is doing all the work of separating the strip from the wallpaper behind it.
+# Deeper than the 0.5 default because these wallpapers are bright at the
+# centre, and the unselected slices need to fall back further than usual for
+# the copper selection ring to read at a glance.
+scrim                   = "#0b0708"
+scrim-alpha             = 0.62
+text                    = "#e8ddd4"
+selected-border         = "#c9714f"
+selected-border-alpha   = 1.0
+unselected-border       = "#8f7f79"
+unselected-border-alpha = 0.22

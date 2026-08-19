@@ -1,0 +1,14 @@
+# Lock input. A section file replaces its whole section rather than merging
+# into the generated default, so background/selection have to be stated here
+# or they fall back to the shell's own hard defaults and drift off-palette.
+background       = "#0b0708"
+background-alpha = 0.72
+text             = "#e8ddd4"
+placeholder      = "#8f7f79"
+text-error       = "#ee6d55"
+border           = "#54313a"
+border-active    = "hyprland.active-border"
+border-error     = "#ee6d55"
+border-alpha     = 1.0
+selection        = "#c9714f"
+selection-alpha  = 0.45

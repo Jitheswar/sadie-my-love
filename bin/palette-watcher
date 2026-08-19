@@ -1,0 +1,30 @@
+#!/bin/bash
+# Keep the palette in step with the wallpaper, whichever way the wallpaper
+# was changed - the GUI picker, `omarchy theme bg next`, or a direct
+# `omarchy theme bg set`. None of those fire a hook, so the background
+# symlink is watched directly.
+#
+# Singleton via flock, and it exits on its own once this theme is no longer
+# active, so nothing is left running for other themes to trip over.
+set -uo pipefail
+
+THEME_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+THEME_SLUG="sadie-my-love"
+STATE="$HOME/.local/state/omarchy/current"
+LOCK="${XDG_RUNTIME_DIR:-/tmp}/sadie-palette-watcher.lock"
+
+exec 9>"$LOCK"
+flock -n 9 || exit 0   # another watcher already owns this
+
+active() { [[ $(cat "$STATE/theme.name" 2>/dev/null) == "$THEME_SLUG" ]]; }
+
+active || exit 0
+"$THEME_DIR/bin/apply-palette"
+
+while active; do
+  # The timeout doubles as the liveness check: without it a watcher would
+  # linger until the next filesystem event even after a theme change.
+  inotifywait -qq -t 60 -e create,moved_to,attrib "$STATE" >/dev/null 2>&1
+  active || break
+  "$THEME_DIR/bin/apply-palette"
+done

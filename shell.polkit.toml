@@ -1,0 +1,14 @@
+# Password prompt. Without this file the generated default lands on the
+# foundational #171314 at full opacity, which is the one card in the whole
+# shell that would read as a flat slab over the wallpaper. Matched to
+# shell.menu.toml so an auth prompt is the same glass as everything else.
+background       = "#0b0708"
+background-alpha = 0.88
+text             = "#e8ddd4"
+text-error       = "#ee6d55"
+border           = "hyprland.active-border"
+border-error     = "#ee6d55"
+border-alpha     = 1.0
+scrim            = "#0b0708"
+scrim-alpha      = 0.55
+accent           = "#c9714f"

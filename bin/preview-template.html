@@ -1,0 +1,447 @@
+<!doctype html>
+<meta charset="utf-8">
+<style>
+__VARS__
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 1800px;
+    height: 1012px;
+    overflow: hidden;
+  }
+
+  body {
+    font-family: "JetBrainsMono Nerd Font", monospace;
+    font-size: 13px;
+    line-height: 1.45;
+    background: url("data:image/jpeg;base64,__BG__") center/cover no-repeat;
+    color: var(--fg);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------------- top bar ---------------- */
+
+  .bar {
+    height: 26px;
+    background: var(--ddbg);
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    font-size: 12.5px;
+    color: var(--dfg);
+  }
+  .bar .ws { display: flex; gap: 10px; align-items: center; }
+  .bar .ws span { color: var(--muted); }
+  .bar .ws .on { color: var(--accent); }
+  .bar .ws .has { color: var(--fg); }
+  .bar .clock {
+    position: absolute;
+    left: 0; right: 0;
+    text-align: center;
+    color: var(--fg);
+    pointer-events: none;
+  }
+  .bar .tray { margin-left: auto; display: flex; gap: 12px; color: var(--dfg); }
+
+  /* ---------------- tiling layout ---------------- */
+
+  .desk {
+    height: calc(1012px - 26px);
+    display: flex;
+    gap: 10px;
+    padding: 10px;
+  }
+  .col { display: flex; flex-direction: column; gap: 10px; flex: 1; min-width: 0; }
+
+  .win {
+    flex: 1;
+    min-height: 0;
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    border: 2px solid var(--lbg);
+    background: var(--bg);
+    box-shadow: 0 12px 34px rgba(11, 7, 8, 0.62);
+  }
+  .win.active {
+    border-color: transparent;
+    background:
+      linear-gradient(var(--bg), var(--bg)) padding-box,
+      linear-gradient(45deg, #c9714f, #f2bb63) border-box;
+  }
+
+  /* ---------------- neovim ---------------- */
+
+  .nvim { display: flex; flex: 1; min-height: 0; }
+
+  .tree {
+    width: 236px;
+    flex-shrink: 0;
+    background: var(--dbg);
+    padding: 6px 0;
+    line-height: 1.28;
+    overflow: hidden;
+  }
+  .tree .title { padding: 1px 10px; color: var(--accent); }
+  .tree .row { padding: 1px 10px; color: var(--dfg); white-space: nowrap; }
+  .tree .row .dot { color: var(--muted); }
+  .tree .row.sel { background: var(--sel); color: var(--lfg); }
+
+  .pane { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+  .tabs {
+    display: flex;
+    background: var(--dbg);
+    font-size: 12.5px;
+    color: var(--dfg);
+  }
+  .tabs .tab { padding: 3px 14px; display: flex; gap: 8px; align-items: center; }
+  .tabs .tab.on { background: var(--bg); color: var(--lfg); }
+  .tabs .tab .x { color: var(--muted); }
+  .tabs .fill { flex: 1; }
+
+  .code { flex: 1; padding: 3px 0; overflow: hidden; white-space: pre; line-height: 1.28; }
+  .code .ln { display: flex; }
+  .code .ln .n {
+    width: 46px;
+    flex-shrink: 0;
+    text-align: right;
+    padding-right: 12px;
+    color: var(--muted);
+  }
+  .code .ln.cur { background: rgba(84, 49, 58, 0.36); }
+  .code .ln.cur .n { color: var(--accent); }
+
+  .status {
+    display: flex;
+    background: var(--dbg);
+    font-size: 12.5px;
+    color: var(--dfg);
+  }
+  .status .seg { padding: 2px 12px; }
+  .status .mode { background: var(--accent); color: var(--ddbg); font-weight: bold; }
+  .status .branch { background: var(--lbg); color: var(--byellow); }
+  .status .fill { flex: 1; }
+
+  /* ---------------- terminal ---------------- */
+
+  .term { flex: 1; padding: 8px 12px; overflow: hidden; white-space: pre; }
+  .term .prompt { color: var(--green); }
+  .term .cursor { background: var(--fg); color: var(--bg); }
+
+  /* ---------------- btop ---------------- */
+
+  .btop { flex: 1; padding: 6px; display: flex; flex-direction: column; gap: 6px; overflow: hidden; }
+  .box {
+    border: 1px solid var(--lbg);
+    border-radius: 5px;
+    padding: 9px 8px 4px;
+    line-height: 1.32;
+    position: relative;
+  }
+  .box > .inner { overflow: hidden; height: 100%; }
+  .box > .cap {
+    position: absolute;
+    top: -9px; left: 10px;
+    background: var(--bg);
+    padding: 0 5px;
+    color: var(--accent);
+    font-size: 12px;
+  }
+  .btop .cols { display: flex; gap: 6px; flex: 1; min-height: 0; }
+  .meter { display: inline-block; letter-spacing: -0.5px; }
+
+  /* ---------------- files ---------------- */
+
+  .files { flex: 1; display: flex; flex-direction: column; background: var(--bg); font-family: "Liberation Sans", "JetBrainsMono Nerd Font", sans-serif; }
+  .files .head {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 9px 14px;
+    background: var(--dbg);
+    color: var(--fg);
+    font-size: 14px;
+  }
+  .files .head .path {
+    background: var(--lbg);
+    border-radius: 6px;
+    padding: 5px 14px;
+    flex: 1;
+    color: var(--lfg);
+  }
+  .files .body { flex: 1; display: flex; min-height: 0; }
+  .files .side { width: 210px; flex-shrink: 0; background: var(--dbg); padding: 8px; font-size: 14px; }
+  .files .side .row { padding: 7px 12px; border-radius: 6px; color: var(--fg); display: flex; gap: 12px; }
+  .files .side .row.on { background: var(--lbg); }
+  .files .grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    padding: 16px;
+    align-content: start;
+    text-align: center;
+    font-size: 13.5px;
+  }
+  .files .grid .ico { font-size: 46px; color: var(--accent); line-height: 1.15; }
+  .files .grid .ico.doc { color: var(--dfg); }
+
+  .r { color: var(--red); }
+  .y { color: var(--yellow); }
+  .o { color: var(--orange); }
+  .g { color: var(--green); }
+  .c { color: var(--cyan); }
+  .b { color: var(--blue); }
+  .m { color: var(--magenta); }
+  .br { color: var(--brown); }
+  .Br { color: var(--bred); }
+  .By { color: var(--byellow); }
+  .Bg { color: var(--bgreen); }
+  .Bc { color: var(--bcyan); }
+  .Bb { color: var(--bblue); }
+  .Bm { color: var(--bmagenta); }
+  .d { color: var(--dfg); }
+  .mu { color: var(--muted); }
+  .a { color: var(--accent); }
+  .w { color: var(--bfg); }
+</style>
+
+<div class="bar">
+  <div class="ws">
+    <span class="on">󰣇</span>
+    <span class="has">1</span><span class="has">2</span><span class="has">3</span>
+    <span>4</span><span class="has">5</span>
+  </div>
+  <div class="clock">Friday 12:47</div>
+  <div class="tray">
+    <span>󰃟</span><span>󰂯</span><span>󰤨</span><span>󰕾</span><span>󰁹</span>
+  </div>
+</div>
+
+<div class="desk">
+  <div class="col">
+
+    <!-- neovim -->
+    <div class="win active">
+      <div class="nvim">
+        <div class="tree">
+          <div class="title">Neo-tree</div>
+          <div class="row"><span class="dot">*</span> omarchy-cmd-screenrecord</div>
+          <div class="row"><span class="dot">*</span> omarchy-cmd-screenshot</div>
+          <div class="row"><span class="dot">*</span> omarchy-cmd-share</div>
+          <div class="row"><span class="dot">*</span> omarchy-cmd-terminal-cwd</div>
+          <div class="row"><span class="dot">*</span> omarchy-install-dev-env</div>
+          <div class="row"><span class="dot">*</span> omarchy-install-docker-dbs</div>
+          <div class="row"><span class="dot">*</span> omarchy-install-dropbox</div>
+          <div class="row"><span class="dot">*</span> omarchy-install-steam</div>
+          <div class="row"><span class="dot">*</span> omarchy-install-tailscale</div>
+          <div class="row"><span class="dot">*</span> omarchy-launch-about</div>
+          <div class="row"><span class="dot">*</span> omarchy-launch-browser</div>
+          <div class="row"><span class="dot">*</span> omarchy-launch-editor</div>
+          <div class="row"><span class="dot">*</span> omarchy-launch-webapp</div>
+          <div class="row"><span class="dot">*</span> omarchy-lock-screen</div>
+          <div class="row sel"><span class="dot">*</span> omarchy-theme-set</div>
+          <div class="row"><span class="dot">*</span> omarchy-theme-bg-next</div>
+          <div class="row"><span class="dot">*</span> omarchy-theme-list</div>
+          <div class="row"><span class="dot">*</span> omarchy-theme-refresh</div>
+          <div class="row"><span class="dot">*</span> omarchy-theme-remove</div>
+          <div class="row"><span class="dot">*</span> omarchy-theme-switcher</div>
+          <div class="row"><span class="dot">*</span> omarchy-theme-update</div>
+          <div class="row"><span class="dot">*</span> omarchy-toggle-idle</div>
+          <div class="row"><span class="dot">*</span> omarchy-toggle-nightlight</div>
+          <div class="row"><span class="dot">*</span> omarchy-update</div>
+          <div class="row"><span class="dot">*</span> omarchy-version</div>
+        </div>
+        <div class="pane">
+          <div class="tabs">
+            <div class="tab"><span class="Bg">󰢱</span> hyprland.lua <span class="x">×</span></div>
+            <div class="tab on"><span class="a">󱆃</span> omarchy-theme-set <span class="x">×</span></div>
+            <div class="fill"></div>
+            <div class="tab d">cph-fd</div>
+          </div>
+          <div class="code"><div class="ln"><span class="n">96</span><span class="d">  </span><span class="m">local</span> theme_name<span class="d">=</span><span class="Bg">"$(omarchy-theme-current)"</span></div>
+<div class="ln"><span class="n">97</span><span class="d">  </span></div>
+<div class="ln"><span class="n">98</span><span class="d">  </span><span class="mu"># Swap every template the theme owns in one pass</span></div>
+<div class="ln"><span class="n">99</span><span class="d">  </span><span class="m">for</span> template <span class="m">in</span> <span class="Bg">"$THEME_PATH"</span>/*.toml; <span class="m">do</span></div>
+<div class="ln"><span class="n">100</span><span class="d">    </span><span class="b">apply_template</span> <span class="Bg">"$template"</span> <span class="d">||</span> <span class="m">continue</span></div>
+<div class="ln"><span class="n">101</span><span class="d">  </span><span class="m">done</span></div>
+<div class="ln"><span class="n">102</span></div>
+<div class="ln"><span class="n">103</span><span class="d">  </span><span class="b">set_gnome_theme</span> <span class="Bg">"$theme_name"</span></div>
+<div class="ln"><span class="n">104</span><span class="d">  </span><span class="b">set_browser_theme</span> <span class="Bg">"$theme_name"</span></div>
+<div class="ln"><span class="n">105</span><span class="d">}</span></div>
+<div class="ln"><span class="n">106</span></div>
+<div class="ln"><span class="n">107</span><span class="b">show_theme_menu</span><span class="d">() {</span></div>
+<div class="ln"><span class="n">108</span><span class="d">  </span><span class="m">local</span> themes<span class="d">=</span><span class="Bg">"$(omarchy-theme-list)"</span></div>
+<div class="ln cur"><span class="n">109</span><span class="d">  </span><span class="m">local</span> count<span class="d">=$(</span><span class="Bg">echo</span> <span class="Bg">"$themes"</span> <span class="d">|</span> <span class="Bg">grep</span> <span class="By">-c</span> . <span class="d">2>/dev/null ||</span> <span class="Bg">echo</span> <span class="o">0</span><span class="d">)</span></div>
+<div class="ln"><span class="n">110</span></div>
+<div class="ln"><span class="n">111</span><span class="d">  </span><span class="m">if</span> <span class="d">[[</span> <span class="By">-z</span> <span class="Bg">"$themes"</span> <span class="d">]] ||</span> <span class="d">((</span> count <span class="d">==</span> <span class="o">0</span> <span class="d">));</span> <span class="m">then</span></div>
+<div class="ln"><span class="n">112</span><span class="d">    </span>notify-send <span class="Bg">"No themes installed"</span> <span class="By">-u</span> critical <span class="By">-t</span> <span class="o">3000</span></div>
+<div class="ln"><span class="n">113</span><span class="d">    </span><span class="m">return</span> <span class="o">1</span></div>
+<div class="ln"><span class="n">114</span><span class="d">  </span><span class="m">fi</span></div>
+<div class="ln"><span class="n">115</span></div>
+<div class="ln"><span class="n">116</span><span class="d">  </span><span class="m">local</span> choice<span class="d">=$(</span>menu <span class="Bg">"Theme"</span> <span class="Bg">"$themes"</span><span class="d">)</span></div>
+<div class="ln"><span class="n">117</span><span class="d">  </span><span class="d">[[</span> <span class="By">-n</span> <span class="Bg">"$choice"</span> <span class="d">]] &&</span> omarchy-theme-set <span class="Bg">"$choice"</span></div>
+<div class="ln"><span class="n">118</span><span class="d">}</span></div>
+<div class="ln"><span class="n">119</span></div>
+<div class="ln"><span class="n">120</span><span class="b">show_background_menu</span><span class="d">() {</span></div>
+<div class="ln"><span class="n">121</span><span class="d">  </span><span class="m">local</span> backgrounds<span class="d">=$(</span>omarchy-theme-bg-list<span class="d">)</span></div>
+<div class="ln"><span class="n">122</span><span class="d">  </span><span class="m">local</span> choice<span class="d">=$(</span>menu <span class="Bg">"Background"</span> <span class="Bg">"$backgrounds"</span><span class="d">)</span></div>
+<div class="ln"><span class="n">123</span></div>
+<div class="ln"><span class="n">124</span><span class="d">  </span><span class="m">case</span> <span class="Bg">"$choice"</span> <span class="m">in</span></div>
+<div class="ln"><span class="n">125</span><span class="d">    </span><span class="Bg">"Next"</span><span class="d">)</span> omarchy-theme-bg-next <span class="d">;;</span></div>
+<div class="ln"><span class="n">126</span><span class="d">    </span><span class="Bg">"Refresh"</span><span class="d">)</span> omarchy-theme-bg-cache <span class="By">--force</span> <span class="d">;;</span></div>
+<div class="ln"><span class="n">127</span><span class="d">    </span><span class="d">*)</span> omarchy-theme-bg-set <span class="Bg">"$choice"</span> <span class="d">;;</span></div>
+<div class="ln"><span class="n">128</span><span class="d">  </span><span class="m">esac</span></div>
+<div class="ln"><span class="n">129</span><span class="d">}</span></div>
+</div>
+          <div class="status">
+            <div class="seg mode">NORMAL</div>
+            <div class="seg branch"> main</div>
+            <div class="seg">bin/omarchy-theme-set</div>
+            <div class="fill"></div>
+            <div class="seg"><span class="r">󰅚 1</span> <span class="y">󰀪 2</span></div>
+            <div class="seg">42% 109:14</div>
+            <div class="seg branch">󰥔 12:47</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- terminal -->
+    <div class="win">
+      <div class="term"><span class="a">sadie</span> <span class="d">~/.config/omarchy/themes</span> <span class="prompt">❯</span> omarchy theme current
+<span class="w">Sadie My Love</span>
+
+<span class="a">sadie</span> <span class="d">~/.config/omarchy/themes</span> <span class="prompt">❯</span> eza <span class="By">-l</span> sadie-my-love
+<span class="d">Permissions Size User      Date Modified Name</span>
+<span class="b">drwxr-xr-x</span>     <span class="mu">-</span> jitheswar 19 Aug 09:15  <span class="a">backgrounds</span>
+<span class="b">drwxr-xr-x</span>     <span class="mu">-</span> jitheswar 19 Aug 10:07  <span class="a">bin</span>
+<span class="b">drwxr-xr-x</span>     <span class="mu">-</span> jitheswar 19 Aug 09:10  <span class="a">docs</span>
+<span class="b">drwxr-xr-x</span>     <span class="mu">-</span> jitheswar 19 Aug 10:16  <span class="a">palettes</span>
+<span class="d">.rw-r--r--</span>  1.7k jitheswar 19 Aug 11:58  <span class="c">btop.theme</span>
+<span class="d">.rw-r--r--</span>   819 jitheswar 19 Aug 12:04  <span class="By">colors.toml</span>
+<span class="d">.rw-r--r--</span>  4.8k jitheswar 19 Aug 11:41  <span class="Bg">hyprland.lua</span>
+<span class="d">.rw-r--r--</span>  420k jitheswar 19 Aug 11:18  <span class="m">preview.png</span>
+<span class="d">.rw-r--r--</span>   22k jitheswar 19 Aug 11:47  <span class="m">preview-unlock.png</span>
+<span class="d">.rw-r--r--</span>   580 jitheswar 19 Aug 11:52  <span class="By">shell.polkit.toml</span>
+
+<span class="a">sadie</span> <span class="d">~/.config/omarchy/themes</span> <span class="prompt">❯</span> <span class="cursor"> </span></div>
+    </div>
+  </div>
+
+  <div class="col">
+
+    <!-- btop -->
+    <div class="win">
+      <div class="btop">
+        <div class="box" style="flex: 0 0 auto">
+          <div class="cap">cpu</div>
+          <div class="inner"><div style="white-space: pre"><span class="d">CPU  </span><span class="g">▁▂▃▅▆▇▆▅▃▂▁▂▄▆▇▆▄▃▂▁▁▂▄▅▇▆▅▃▂▁▂▃▅▆▇▆▄▂▁▂▃▅▆▇▆▅▃▂▁▂▄▆▇▆▄▃▂▁▂▃▅▆▇▆▅▃▂▁</span><span class="d">    12:47:21</span>
+<span class="d">C0 </span><span class="By">  3%</span><span class="d">  C4 </span><span class="By">  1%</span><span class="d">  C8 </span><span class="By"> 12%</span><span class="d">  C12</span><span class="By">  2%</span><span class="d">   Eng Sample 100-000001243</span>
+<span class="d">C1 </span><span class="By">  1%</span><span class="d">  C5 </span><span class="By">  4%</span><span class="d">  C9 </span><span class="By">  0%</span><span class="d">  C13</span><span class="By">  1%</span><span class="d">   </span><span class="o">42°C</span><span class="d">      </span><span class="a">2.0 GHz</span>
+<span class="d">C2 </span><span class="By">  0%</span><span class="d">  C6 </span><span class="By">  2%</span><span class="d">  C10</span><span class="By">  3%</span><span class="d">  C14</span><span class="By">  0%</span><span class="d">   Load avg: 0.76 0.93 0.86</span>
+<span class="d">C3 </span><span class="By">  2%</span><span class="d">  C7 </span><span class="By">  0%</span><span class="d">  C11</span><span class="By">  1%</span><span class="d">  C15</span><span class="By">  4%</span><span class="d">   up 3d 23:19</span></div></div>
+        </div>
+        <div class="cols">
+          <div class="box" style="flex: 1; min-width: 0">
+            <div class="cap">mem</div>
+            <div class="inner"><div style="white-space: pre"><span class="d">Total:      </span><span class="w">62.1 GiB</span>
+<span class="c">Used</span><span class="d">:       </span><span class="w">32.0 GiB</span>
+<span class="a">▉▉▉▉▉▉▉▉▉</span><span class="mu">▉▉▉▉▉▉▉▉</span><span class="d"> 52%</span>
+<span class="c">Available</span><span class="d">:  </span><span class="w">30.0 GiB</span>
+<span class="a">▉▉▉▉▉▉▉▉</span><span class="mu">▉▉▉▉▉▉▉▉▉</span><span class="d"> 48%</span>
+<span class="c">Cached</span><span class="d">:     </span><span class="w">37.7 GiB</span>
+<span class="a">▉▉▉▉▉▉▉▉▉▉▉</span><span class="mu">▉▉▉▉▉▉</span><span class="d"> 61%</span>
+<span class="c">Free</span><span class="d">:       </span><span class="w">2.31 GiB</span>
+<span class="a">▉</span><span class="mu">▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉</span><span class="d">  4%</span>
+<span class="c">swap</span><span class="d">:       </span><span class="w">252 KiB</span>
+<span class="mu">▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉</span><span class="d">  0%</span>
+<span class="a">IO</span><span class="d">        read  write</span>
+<span class="d">nvme0n1  </span><span class="Bg">6.2M</span><span class="d">   1.1M</span>
+<span class="d">nvme1n1  </span><span class="Bg">0.0M</span><span class="d">   0.2M</span>
+<span class="d">zram0    </span><span class="Bg">0.0M</span><span class="d">   0.0M</span></div></div>
+          </div>
+          <div class="box" style="flex: 1.15; min-width: 0">
+            <div class="cap">disks</div>
+            <div class="inner"><div style="white-space: pre"><span class="d">root      </span><span class="Bg">▼6.2M</span><span class="d">   929 GiB</span>
+<span class="d">Used: 64% </span><span class="a">▉▉▉▉▉▉</span><span class="mu">▉▉▉</span><span class="d">  596 GiB</span>
+<span class="d">swap      </span><span class="Bg">▼0.0M</span><span class="d">  66.1 GiB</span>
+<span class="d">Used:  0% </span><span class="mu">▉▉▉▉▉▉▉▉▉</span><span class="d">  252 KiB</span>
+<span class="d">home      </span><span class="Bg">▼6.2M</span><span class="d">   929 GiB</span>
+<span class="d">Used: 64% </span><span class="a">▉▉▉▉▉▉</span><span class="mu">▉▉▉</span><span class="d">  596 GiB</span>
+<span class="d">log       </span><span class="Bg">▼0.1M</span><span class="d">   929 GiB</span>
+<span class="d">Used: 64% </span><span class="a">▉▉▉▉▉▉</span><span class="mu">▉▉▉</span><span class="d">  596 GiB</span>
+<span class="d">boot      </span><span class="Bg">▼0.0M</span><span class="d">  1.02 GiB</span>
+<span class="d">Used: 31% </span><span class="a">▉▉▉</span><span class="mu">▉▉▉▉▉▉</span><span class="d">  325 MiB</span>
+<span class="d">pkg       </span><span class="Bg">▼6.2M</span><span class="d">   929 GiB</span>
+<span class="d">Used: 64% </span><span class="a">▉▉▉▉▉▉</span><span class="mu">▉▉▉</span><span class="d">  596 GiB</span>
+<span class="d">esp       </span><span class="Bg">▼0.0M</span><span class="d">  2.00 GiB</span>
+<span class="d">Used: 18% </span><span class="a">▉▉</span><span class="mu">▉▉▉▉▉▉▉</span><span class="d">  368 MiB</span></div></div>
+          </div>
+          <div class="box" style="flex: 1.9; min-width: 0">
+            <div class="cap">proc</div>
+            <div class="inner"><div style="white-space: pre"><span class="a">Pid:  Program:     Command:        Cpu%</span>
+<span class="d">824792</span> <span class="w">waybar</span>       /usr/bin/wayba   <span class="Bg">0.0</span>
+<span class="d">690183</span> <span class="w">cliamp</span>       cliamp           <span class="Bg">0.0</span>
+<span class="d">7886  </span> <span class="w">chromium</span>     /usr/lib/chrom   <span class="Bg">0.0</span>
+<span class="d">824766</span> <span class="w">swaybg</span>       /usr/bin/swayb   <span class="Bg">0.0</span>
+<span class="d">7814  </span> <span class="w">chromium</span>     /usr/lib/chrom   <span class="Bg">0.0</span>
+<span class="d">824511</span> <span class="w">localsea</span>     /usr/lib/local   <span class="Bg">0.0</span>
+<span class="d">730555</span> <span class="w">chromium</span>     /usr/lib/chrom   <span class="Bg">0.0</span>
+<span class="d">824800</span> <span class="w">nautilus</span>     /usr/bin/nauti   <span class="Bg">0.0</span>
+<span class="d">792357</span> <span class="w">nvim</span>         nvim --embed     <span class="Bg">0.0</span>
+<span class="d">719536</span> <span class="w">nvim</span>         nvim --embed     <span class="Bg">0.0</span>
+<span class="d">802955</span> <span class="w">nvim</span>         nvim --embed     <span class="Bg">0.0</span>
+<span class="d">824788</span> <span class="w">glycin-i</span>     /usr/lib/glyci   <span class="Bg">0.0</span>
+<span class="d">794589</span> <span class="w">glycin-i</span>     /usr/lib/glyci   <span class="Bg">0.0</span>
+<span class="d">49045 </span> <span class="w">spotify</span>      /opt/spotify/s   <span class="Bg">0.0</span>
+<span class="d">48883 </span> <span class="w">spotify</span>      /opt/spotify/s   <span class="Bg">0.0</span></div></div>
+          </div>
+        </div>
+        <div class="box" style="flex: 0 0 auto">
+          <div class="cap">net</div>
+          <div class="inner"><div style="white-space: pre"><span class="d">101K </span><span class="Bc">▁▂▁▃▂▅▃▂▁▁▂▄▂▁▃▂▁▁▂▃▅▄▂▁▁▂▃▂▁▂▄▃▁▁▂▃▅▃▂▁▁▂▃▂▁</span>  <span class="a">download</span> <span class="d">▼</span> <span class="w">29.0 KiB/s</span>  <span class="d">Top:</span> <span class="w">33.9 Mibps</span>  <span class="d">Total:</span> <span class="w">81.1 GiB</span>
+<span class="d">101K </span><span class="Bm">▁▂▃▁▂▁▃▂▁▁▂▁▃▂▁▂▃▁▁▂▁▃▂▁▁▂▄▂▁▁▂▁▃▂▁▁▂▃▁▂▁▁▂▁</span>  <span class="a">upload  </span> <span class="d">▲</span> <span class="w">3.01 KiB/s</span>  <span class="d">Top:</span> <span class="w">520 Kibps</span>   <span class="d">Total:</span> <span class="w">22.4 GiB</span></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- files -->
+    <div class="win">
+      <div class="files">
+        <div class="head">
+          <span></span>
+          <span style="font-weight:600">Files</span>
+          <span class="d">☰</span>
+          <span class="d">‹</span><span class="d">›</span>
+          <div class="path"><span style="margin-right:8px">󰋜</span>Home</div>
+          <span class="d">⋮</span>
+        </div>
+        <div class="body">
+          <div class="side">
+            <div class="row on"><span class="a">󰋜</span> Home</div>
+            <div class="row"><span class="d">󰥔</span> Recent</div>
+            <div class="row"><span class="d">󰓎</span> Starred</div>
+            <div class="row"><span class="d">󰛳</span> Network</div>
+            <div class="row"><span class="d">󰩹</span> Trash</div>
+            <div class="row"><span class="d">󰇚</span> Downloads</div>
+            <div class="row"><span class="d">󰉏</span> Pictures</div>
+          </div>
+          <div class="grid">
+            <div><div class="ico">󰉋</div>Desktop</div>
+            <div><div class="ico doc">󰈙</div>Documents</div>
+            <div><div class="ico">󰉍</div>Downloads</div>
+            <div><div class="ico">󰉋</div>Dropbox</div>
+            <div><div class="ico">󰎇</div>Music</div>
+            <div><div class="ico">󰋩</div>Pictures</div>
+            <div><div class="ico">󰉌</div>Public</div>
+            <div><div class="ico">󰕧</div>Videos</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

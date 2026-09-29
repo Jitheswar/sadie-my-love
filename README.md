@@ -1,11 +1,10 @@
 # Sadie My Love
 
-An [Omarchy](https://omarchy.org) theme in copper and oxblood, whose palette follows its own wallpaper.
+A copper and oxblood theme for [Omarchy](https://omarchy.org). Change the wallpaper and the colors shift with it, without the theme turning into something else.
 
 ![Preview](preview.png)
 
-Most themes ship one palette and a folder of wallpapers that may or may not agree with it.
-This one ships four wallpapers and derives a palette for each, so switching the background re-tints the whole desktop - bar, borders, terminal, btop, editor - without ever turning into a different theme.
+It ships four wallpapers. Each one gets its own slightly rotated version of the same palette, so switching backgrounds re-tints the bar, borders, terminal, btop and editor together.
 
 ## Install
 
@@ -13,7 +12,7 @@ This one ships four wallpapers and derives a palette for each, so switching the 
 omarchy theme install https://github.com/Jitheswar/sadie-my-love
 ```
 
-Or clone it into place yourself:
+Or clone it yourself:
 
 ```
 git clone https://github.com/Jitheswar/sadie-my-love \
@@ -21,67 +20,60 @@ git clone https://github.com/Jitheswar/sadie-my-love \
 omarchy theme set sadie-my-love
 ```
 
-Cycle the wallpaper with `omarchy theme bg next` (`SUPER + CTRL + SHIFT + SPACE` by default) and the palette follows within a second.
+Change wallpaper with `omarchy theme bg next` (`SUPER + CTRL + SHIFT + SPACE` by default). The colors follow within a second.
 
-## How the palette works
+## How the colors work
 
-There is one hand-tuned palette, held as `REFERENCE` in `bin/generate-palettes`.
-It carries the properties worth protecting: an even L\* ladder through the backgrounds, low-chroma body text, at least 4.5:1 contrast on every text colour, and ANSI hues that stay distinguishable from each other.
+There is one hand-tuned palette, stored as `REFERENCE` in `bin/generate-palettes`. It keeps even steps of lightness across the backgrounds, soft body text, at least 4.5:1 contrast on all text, and terminal colors that stay easy to tell apart.
 
-Each wallpaper contributes only a **hue rotation** to that palette, taken from its own dominant colour.
-Lightness and chroma are never touched, so the contrast and separation guarantees survive by construction rather than by luck.
-The rotation is done in Oklch - a naive HSL rotation swings yellows much further than reds and pulls the palette apart.
+Each wallpaper only rotates the hue of that palette, based on its own dominant color. Lightness and chroma are never changed, so the contrast holds on every wallpaper. Rotation happens in Oklch, because a plain HSL rotation pushes yellows around far more than reds.
 
-Three things keep the rotations from drifting into unrelated themes:
+Three limits keep the result recognizable:
 
 | | |
 |---|---|
-| **Strength** | Only 70% of each wallpaper's measured offset is applied. |
-| **Clamp** | Rotation is capped at 28 degrees, so one outlier wallpaper cannot swing the UI somewhere that no longer belongs to this theme. |
-| **Damping** | Near-neutral slots take a fraction of the rotation, so a hue shift does not read as a colour cast on plain text or plain surfaces. |
+| **Strength** | Only 70% of the wallpaper's measured hue offset is applied. |
+| **Clamp** | Rotation never goes past 28 degrees. |
+| **Damping** | Near-gray colors rotate less, so plain text and surfaces don't pick up a tint. |
 
-In practice the four wallpapers land at +0.0, -19.2, -9.2 and +2.2 degrees.
+The four wallpapers end up at +0.0, -19.2, -9.2 and +2.2 degrees.
 
-Colour extraction alone was not enough to get here. On `01-1412030` a raw extraction collapses six of sixteen slots to within a few RGB units of each other, which makes a passing test and a failing test the same colour. Hence the hand-tuned reference plus a rotation, rather than per-wallpaper extraction.
+Pulling colors straight from each wallpaper didn't work. On `01-1412030`, six of the sixteen slots came out within a few RGB units of each other, so a passing color and a failing one looked the same. That's why there's a hand-tuned reference plus a rotation.
 
-## Everything themed is derived
+## Nothing is hardcoded
 
-No file in this theme has colours written into it literally.
-Every artefact that carries colour is computed from `colors.toml` at apply time, so it rotates with everything else.
-A hand-written `btop.theme` would have held the reference copper while the bar and borders rotated 19 degrees away from it on wallpaper 02, which is obvious side by side.
+No file in the theme has a color written into it. Everything is generated from `colors.toml` when the palette is applied. If `btop.theme` were written by hand, it would stay on the reference copper while the bar and borders rotated 19 degrees away on wallpaper 02.
 
-`docs/adr/0001-every-themed-artefact-is-derived.md` has the reasoning and the options that were rejected.
+The reasoning is in `docs/adr/0001-every-themed-artefact-is-derived.md`.
 
-## Layout
+## What's in the repo
 
 ```
-backgrounds/          the four wallpapers
-palettes/             one colors.toml per wallpaper, generated
-colors.toml           the live palette, a copy of one of the above
-bin/generate-palettes rebuild palettes/ from the reference palette
-bin/generate-btop     rebuild btop.theme from the live palette
-bin/generate-preview  rebuild preview.png from the live palette
-bin/apply-palette     swap colors.toml to match the current wallpaper
-bin/palette-watcher   run apply-palette when the wallpaper changes
-hyprland.lua          borders, rounding, shadow, blur
-shell.*.toml          per-section overrides for the Omarchy shell
+backgrounds/           the four wallpapers
+palettes/              one colors.toml per wallpaper (generated)
+colors.toml            the live palette, a copy of one of the above
+bin/generate-palettes  rebuild palettes/ from the reference palette
+bin/generate-btop      rebuild btop.theme from the live palette
+bin/generate-preview   rebuild preview.png from the live palette
+bin/apply-palette      swap colors.toml to match the current wallpaper
+bin/palette-watcher    run apply-palette when the wallpaper changes
+hyprland.lua           borders, rounding, shadow, blur
+shell.*.toml           per-section overrides for the Omarchy shell
 ```
 
-`palette-watcher` exists because Omarchy fires no hook on a background change; it follows the background symlink directly.
-It is a singleton, and it exits on its own once this theme is no longer active, so nothing is left running for other themes to trip over.
-Hyprland starts it from `hyprland.lua`.
+Omarchy doesn't fire a hook when the background changes, so `palette-watcher` watches the background symlink directly. Only one copy runs at a time, it quits by itself when this theme stops being active, and Hyprland starts it from `hyprland.lua`.
 
-## Regenerating
+## Rebuilding
 
 ```
-bin/generate-palettes            # after editing REFERENCE or adding a wallpaper
-bin/generate-preview             # after a palette change
-bin/generate-preview palettes/02-1331868.toml   # pin the tile to one wallpaper
+bin/generate-palettes                              # after editing REFERENCE or adding a wallpaper
+bin/generate-preview                               # after a palette change
+bin/generate-preview palettes/02-1331868.toml      # pin the preview to one wallpaper
 ```
 
-`generate-preview` needs `chromium` and `imagemagick`; it lays the desktop out in `bin/preview-template.html`, fills it with the live palette, and screenshots it headlessly, so the tile cannot advertise colours the theme does not apply.
+`generate-preview` needs `chromium` and `imagemagick`. It fills `bin/preview-template.html` with the live palette and screenshots it, so the preview only shows colors the theme really applies.
 
-Omarchy's theme picker caches its thumbnails on directory mtime, so a regenerated `preview.png` may not show up until the cache is nudged:
+Omarchy's theme picker caches thumbnails, so a new `preview.png` may not show up right away. Clear the cache with:
 
 ```
 rm -f ~/.cache/omarchy/image-selector/*.rows \
@@ -92,5 +84,4 @@ touch ~/.config/omarchy/themes/sadie-my-love
 
 ## Credits
 
-Wallpapers are fan collages of Sadie Sink, collected from public wallpaper sites; they belong to their original creators and are included here only so the theme ships with the backgrounds it was tuned against.
-Icons are Yaru-wartybrown.
+The wallpapers are fan collages of Sadie Sink from public wallpaper sites. They belong to their original creators and are here only so the theme ships with the backgrounds it was tuned against. Icons are Yaru-wartybrown.

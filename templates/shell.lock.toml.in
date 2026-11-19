@@ -1,0 +1,14 @@
+# Lock input. A section file replaces its whole section rather than merging
+# into the generated default, so background/selection have to be stated here
+# or they fall back to the shell's own hard defaults and drift off-palette.
+background       = "{{ darker_background }}"
+background-alpha = 0.72
+text             = "{{ foreground }}"
+placeholder      = "{{ dark_foreground }}"
+text-error       = "{{ bright_red }}"
+border           = "{{ selection }}"
+border-active    = "hyprland.active-border"
+border-error     = "{{ bright_red }}"
+border-alpha     = 1.0
+selection        = "{{ accent }}"
+selection-alpha  = 0.45

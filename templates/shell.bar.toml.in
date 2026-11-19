@@ -1,0 +1,7 @@
+background       = "{{ darker_background }}"
+background-alpha = 0.72
+text             = "{{ foreground }}"
+active           = "{{ accent }}"
+scale-with-font  = true
+size-horizontal  = 26
+size-vertical    = 28

@@ -8,19 +8,31 @@ It ships four wallpapers. Each one gets its own slightly rotated version of the 
 
 ## Install
 
-```
-omarchy theme install https://github.com/Jitheswar/sadie-my-love
-```
+Requires Omarchy 4.5 or newer.
 
-Or clone it yourself:
+The theme runs a little code of its own: a Hyprland config for its borders,
+glass and motion, and a watcher that follows the wallpaper. Omarchy only runs
+that for themes you keep yourself, so clone it somewhere and link it in:
 
 ```
-git clone https://github.com/Jitheswar/sadie-my-love \
-  ~/.config/omarchy/themes/sadie-my-love
+git clone https://github.com/Jitheswar/sadie-my-love ~/.local/share/sadie-my-love
+ln -s ~/.local/share/sadie-my-love ~/.config/omarchy/themes/sadie-my-love
 omarchy theme set sadie-my-love
 ```
 
+`omarchy theme install https://github.com/Jitheswar/sadie-my-love` also works,
+but Omarchy strips the Lua from themes installed that way. You still get the
+palette, the copper-to-amber borders and the dressed shell, fixed on the first
+wallpaper's colors, without the watcher, blur tuning, ember shadow or motion.
+
 Change wallpaper with `omarchy theme bg next` (`SUPER + CTRL + SHIFT + SPACE` by default). The colors follow within a second.
+
+To update, throw away the live palette the watcher wrote and pull:
+
+```
+git -C ~/.local/share/sadie-my-love checkout -- .
+git -C ~/.local/share/sadie-my-love pull
+```
 
 ## How the colors work
 
@@ -44,6 +56,10 @@ Pulling colors straight from each wallpaper didn't work. On `01-1412030`, six of
 
 No file in the theme has a color written into it. Everything is generated from `colors.toml` when the palette is applied. If `btop.theme` were written by hand, it would stay on the reference copper while the bar and borders rotated 19 degrees away on wallpaper 02.
 
+- `btop.theme` and `shell.*.toml` are rendered by `bin/generate-btop` and `bin/generate-shell` (the shell designs live in `templates/`), because Omarchy copies both verbatim.
+- `hyprland.lua` reads the live `colors.toml` each time Hyprland loads it.
+- Each palette also carries `hyprland_active_border` and `hyprland_inactive_border`, which Omarchy uses for window borders and the shell's border tokens.
+
 The reasoning is in `docs/adr/0001-every-themed-artefact-is-derived.md`.
 
 ## What's in the repo
@@ -52,12 +68,14 @@ The reasoning is in `docs/adr/0001-every-themed-artefact-is-derived.md`.
 backgrounds/           the four wallpapers
 palettes/              one colors.toml per wallpaper (generated)
 colors.toml            the live palette, a copy of one of the above
+templates/             shell section designs, as {{ palette key }} templates
 bin/generate-palettes  rebuild palettes/ from the reference palette
 bin/generate-btop      rebuild btop.theme from the live palette
+bin/generate-shell     rebuild shell.*.toml from the live palette
 bin/generate-preview   rebuild preview.png from the live palette
 bin/apply-palette      swap colors.toml to match the current wallpaper
 bin/palette-watcher    run apply-palette when the wallpaper changes
-hyprland.lua           borders, rounding, shadow, blur
+hyprland.lua           borders, ember shadow, blur, motion (reads colors.toml)
 shell.*.toml           per-section overrides for the Omarchy shell
 ```
 
@@ -67,11 +85,12 @@ Omarchy doesn't fire a hook when the background changes, so `palette-watcher` wa
 
 ```
 bin/generate-palettes                              # after editing REFERENCE or adding a wallpaper
+bin/generate-shell                                 # after editing templates/
 bin/generate-preview                               # after a palette change
 bin/generate-preview palettes/02-1331868.toml      # pin the preview to one wallpaper
 ```
 
-`generate-preview` needs `chromium` and `imagemagick`. It fills `bin/preview-template.html` with the live palette and screenshots it, so the preview only shows colors the theme really applies.
+`generate-palettes` needs `imagemagick`. `generate-preview` needs `chromium` and `imagemagick`. It fills `bin/preview-template.html` with the live palette and screenshots it, so the preview only shows colors the theme really applies.
 
 Omarchy's theme picker caches thumbnails, so a new `preview.png` may not show up right away. Clear the cache with:
 

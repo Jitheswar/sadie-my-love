@@ -1,0 +1,48 @@
+#!/usr/bin/env python3
+"""Render the shell.*.toml section overrides from the live colors.toml.
+
+Omarchy merges each theme-root shell.<section>.toml into the generated
+shell.toml, but it copies them verbatim: no {{ }} substitution happens for a
+section file. Written by hand they would hold the reference copper while the
+rest of the shell rotated with the wallpaper.
+
+So the designs live in templates/shell.<section>.toml.in, referring to palette
+keys as {{ key }}, and this script renders them next to colors.toml. The
+rendered files are committed too, so a clone that never runs this script still
+ships a complete, correct theme for the default wallpaper.
+"""
+
+import re
+import sys
+from pathlib import Path
+
+THEME = Path(__file__).resolve().parent.parent
+COLORS = THEME / "colors.toml"
+TEMPLATES = THEME / "templates"
+TOKEN = re.compile(r"\{\{\s*([A-Za-z0-9_]+)\s*\}\}")
+
+
+def palette():
+    out = {}
+    for line in COLORS.read_text().splitlines():
+        m = re.match(r'\s*([A-Za-z0-9_]+)\s*=\s*"([^"]*)"', line)
+        if m:
+            out[m[1]] = m[2]
+    return out
+
+
+def main():
+    pal = palette()
+    rendered = 0
+    for tpl in sorted(TEMPLATES.glob("shell.*.toml.in")):
+        def sub(m):
+            if m[1] not in pal:
+                sys.exit(f"{tpl.name}: colors.toml has no '{m[1]}'")
+            return pal[m[1]]
+        (THEME / tpl.name[:-3]).write_text(TOKEN.sub(sub, tpl.read_text()))
+        rendered += 1
+    print(f"shell.*.toml <- colors.toml ({rendered} sections)")
+
+
+if __name__ == "__main__":
+    main()

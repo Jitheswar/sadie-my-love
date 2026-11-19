@@ -31,4 +31,7 @@ Rejected: deleting both lets Omarchy generate `aether.nvim` and a VS Code theme 
 
 `bin/apply-palette` is the only place that swaps the live palette, so any future generator must be invoked from there, between the `colors.toml` copy and `omarchy-theme-set`.
 
+Omarchy 4.5 copies `shell.<section>.toml` files without substituting colours, so they follow the same pattern as btop: designs in `templates/`, rendered by `bin/generate-shell`.
+`hyprland.lua` reads the staged `colors.toml` itself when Hyprland loads it, so it needs no generator.
+
 Adding a themed artefact with literal colours in it is a regression against this ADR even when it looks correct at the time, because it will only look correct on one wallpaper.

@@ -1,0 +1,5 @@
+background       = "{{ darker_background }}"
+background-alpha = 0.88
+text             = "{{ foreground }}"
+border           = "hyprland.active-border"
+border-alpha     = 1.0

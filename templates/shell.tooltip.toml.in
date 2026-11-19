@@ -1,0 +1,5 @@
+background       = "{{ darker_background }}"
+background-alpha = 0.92
+text             = "{{ foreground }}"
+border           = "{{ selection }}"
+border-alpha     = 1.0

@@ -1,12 +1,49 @@
 -- Sadie My Love - theme-scoped Hyprland look.
 -- Everything here applies only while this theme is active; switching themes
 -- drops all of it and restores whatever the next theme asks for.
+--
+-- No colour is written into this file. Each one is read from the staged
+-- colors.toml, which bin/apply-palette swaps per wallpaper, so the borders,
+-- groupbar, shadow and clear colour rotate with the bar and terminal instead
+-- of holding the reference copper (docs/adr/0001).
+
+local home = os.getenv("HOME") or ""
+
+-- The reference palette, used only if colors.toml cannot be read.
+local palette = {
+  accent = "c9714f",
+  bright_yellow = "f2bb63",
+  lighter_background = "2b2224",
+  darker_background = "0b0708",
+  bright_foreground = "faf5f1",
+  dark_foreground = "8f7f79",
+}
+
+local function read_palette(path)
+  local file = io.open(path, "r")
+  if not file then return end
+  for line in file:lines() do
+    local key, hex = line:match('^%s*([%w_]+)%s*=%s*"#(%x%x%x%x%x%x)"')
+    if key then palette[key] = hex:lower() end
+  end
+  file:close()
+end
+
+read_palette(home .. "/.local/state/omarchy/current/theme/colors.toml")
+
+local function rgba(key, alpha)
+  return "rgba(" .. palette[key] .. alpha .. ")"
+end
+
+local function rgb(key)
+  return "rgb(" .. palette[key] .. ")"
+end
 
 -- Copper climbing into amber, lit like the wallpapers.
-local active_border_color = { colors = { "rgba(c9714fee)", "rgba(f2bb63ee)" }, angle = 45 }
+local active_border_color = { colors = { rgba("accent", "ee"), rgba("bright_yellow", "ee") }, angle = 45 }
 
 -- Inactive windows recede into the oxblood surface rather than vanishing.
-local inactive_border_color = "rgba(2b2224cc)"
+local inactive_border_color = rgba("lighter_background", "cc")
 
 hl.config({
   general = {
@@ -18,7 +55,7 @@ hl.config({
       -- there is no reason for the one unthemed border in the session to be
       -- the loudest colour on the screen.
       nogroup_border = inactive_border_color,
-      nogroup_border_active = "rgba(f2bb63ee)",
+      nogroup_border_active = rgba("bright_yellow", "ee"),
     },
   },
 
@@ -38,11 +75,11 @@ hl.config({
       -- The active tab is lit by the same copper the border starts from,
       -- kept low enough that the window content behind it still reads.
       col = {
-        active = "rgba(c9714f4d)",
-        inactive = "rgba(2b222466)",
+        active = rgba("accent", "4d"),
+        inactive = rgba("lighter_background", "66"),
       },
-      text_color = "rgb(faf5f1)",
-      text_color_inactive = "rgb(8f7f79)",
+      text_color = rgb("bright_foreground"),
+      text_color_inactive = rgb("dark_foreground"),
       -- A 1px indicator disappears against a gradient; 2px is the least
       -- that still reads as a deliberate underline.
       indicator_height = 2,
@@ -53,7 +90,7 @@ hl.config({
   -- switches and in the moment before the wallpaper paints. Hyprland defaults
   -- it to a neutral #111111, which flashes grey in a theme with no grey in it.
   misc = {
-    background_color = "rgb(0b0708)",
+    background_color = rgb("darker_background"),
   },
 
   decoration = {
@@ -65,14 +102,19 @@ hl.config({
     dim_inactive = true,
     dim_strength = 0.10,
 
-    -- Shadow is tinted with the darkest background rather than pure black,
-    -- so it reads as depth in this palette instead of a grey halo.
+    -- The focused window carries a faint ember halo in the accent, as if the
+    -- copper border were giving off light; unfocused windows get only a
+    -- plain shadow in the darkest background, never pure black, so it reads
+    -- as depth in this palette instead of a grey ring. The halo is kept
+    -- low enough that it lifts the window without blooming over its
+    -- neighbours in a tiled layout.
     shadow = {
       enabled = true,
-      range = 26,
+      range = 30,
       render_power = 3,
-      color = "rgba(0b0708bb)",
-      color_inactive = "rgba(0b070866)",
+      offset = "0 4",
+      color = rgba("accent", "30"),
+      color_inactive = rgba("darker_background", "66"),
     },
 
     -- Blur is what makes the bar and menus read as glass over the wallpaper.
@@ -123,16 +165,24 @@ hl.animation({ leaf = "layersOut", enabled = true, speed = 2.2, bezier = "linear
 
 hl.animation({ leaf = "fade", enabled = true, speed = 2.6, bezier = "sadieSettle" })
 
+-- Workspaces slide only a short way and fade across it, so a switch reads as
+-- the same desk turning rather than a whole screen being shoved off. The
+-- scratchpad drops in vertically, which keeps it distinct from a switch.
+hl.animation({ leaf = "workspaces", enabled = true, speed = 3.6, bezier = "sadieSettle", style = "slidefade 14%" })
+hl.animation({ leaf = "specialWorkspace", enabled = true, speed = 3.2, bezier = "sadieSettle", style = "slidefadevert 18%" })
+
 -- The base is dark enough that full-opacity terminals read as flat cutouts.
 -- A whisper of transparency lets the wallpaper's warmth sit underneath.
-o.window({ tag = "terminal" }, { opacity = "0.96 0.92" })
+-- Through Omarchy's own helper, so Appearance > Windows > Window Opacity can
+-- still turn terminals opaque or glassy over the top of this.
+o.transparent_window({ tag = "terminal" }, "0.96 0.92")
 
 -- Blur the shell's own layers. Without these rules the translucency set in
 -- shell.*.toml would just show the wallpaper through sharply; Omarchy ships
 -- no blur layerrules of its own. ignore_alpha keeps the blur from bleeding
 -- out past the rounded corners of each surface.
 hl.layer_rule({
-  match = { namespace = "^(omarchy-bar|omarchy-menu|omarchy-image-selector|omarchy-emojis|omarchy-clipboard|omarchy-keyboard-panel|omarchy-notifications|omarchy-osd|omarchy-polkit|omarchy-reminders|omarchy-network-qr)$" },
+  match = { namespace = "^(omarchy-bar|omarchy-menu|omarchy-image-selector|omarchy-emojis|omarchy-clipboard|omarchy-keyboard-panel|omarchy-notifications|omarchy-osd|omarchy-polkit|omarchy-reminders|omarchy-network-qr|omarchy-dock|omarchy-dock-apps)$" },
   blur = true,
   blur_popups = true,
   ignore_alpha = 0.2,

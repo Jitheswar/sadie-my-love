@@ -1,0 +1,6 @@
+background       = "{{ darker_background }}"
+background-alpha = 0.90
+text             = "{{ foreground }}"
+border           = "hyprland.active-border"
+border-alpha     = 1.0
+countdown        = "{{ accent }}"

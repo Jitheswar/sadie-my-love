@@ -34,6 +34,11 @@ cp "$palette" "$THEME_DIR/colors.toml"
 # every generated surface rotates away from it.
 "$THEME_DIR/bin/generate-btop" >/dev/null
 
+# Omarchy copies shell.<section>.toml files verbatim, without substituting
+# colours, so they are rendered from the new palette here for the same reason.
+# hyprland.lua needs nothing: it reads the staged colors.toml when it loads.
+"$THEME_DIR/bin/generate-shell" >/dev/null
+
 # SKIP_BACKGROUND matters: omarchy-theme-set would otherwise cycle to the
 # *next* wallpaper, fighting the one the user just chose.
 OMARCHY_THEME_SKIP_BACKGROUND=1 omarchy-theme-set "$THEME_SLUG" >/dev/null 2>&1
